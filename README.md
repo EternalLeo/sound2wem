@@ -1,4 +1,3 @@
-<meta name="google-site-verification" content="mmqd6lA3evrEOJplJUyTIFXyR1YhLTW4_bvnIE7qN1c" />
 <div align="center">
 
 # sound2wem
