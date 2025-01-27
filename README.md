@@ -39,15 +39,52 @@ Upon running the script for the first time, you'll be prompted to install Wwise,
 If installing FFmpeg is required, the script will temporarily install 7zip if not found to unzip it.
 The script has automatic updates straight from this github (which can be turned off in the configs).
 
+## Features
+
+Easy configuration achieved with ffmpeg, all accessible in the configuration section of the script.\
+Set `bitrate`, `audio channels`, `volume`, and custom flags.
+
+Intuitive drag 'n drop conversion process – converts any audio format to .wav which is then converted to .wem
+
+Script updates, very rare, will require manual configuration migration, due to the choice of not creating a config file for superior portability.
+
 ## Extra
 
-Internally, it uses both FFmpeg and Wwise for conversion. I documended the script as much as I had patience to.
+Internally, it uses both FFmpeg and Wwise for conversion. I documented the script as much as I had patience to.
 
 I use `foobar2000` with `vgmstream extension` to listen to Wwise format audio files.
 
-I use `Wwiseutil-gui` to replace the desired audio files in Wwise sound banks (.bnk).
+I use `Wwiseutil-gui` or `BNKReplacer` to replace the desired audio files in Wwise sound banks (.bnk). The output format differs a bit I believe, since in some applications one will work but not the other.
 
-## Future to do list
- - Currently automatic updates reset the script configs, fix that.
+## Future Development
 
-And since the only `to do` is fixing the `to do`, then there's nothing to do for now.
+- For more customizable automated workflows, it could be a future update to configuration as flags, or even a custom optional config file ruleset.\
+e.g. `zSound2wem.cmd --volume 1.5 audio.mp3` out: `audio.wem`\
+When and if this is implemented, potentially re-include temporarily storing arguments in case of script update.
+
+## Changelog
+
+### - Version 3
+
+Made automatic updates `true` by default instead of `forced`.\
+Including handling errors better. Does not try to re-run the conversion task by storing arguments in a temp file anymore.
+
+Bug fixes:\
+\- fixed errors that occured if paths to ffmpeg or audio files had special characters like spaces
+(still, don't try to break it too hard)
+
+Deprecated wmic for a niche part of installation and replaced with a better alternative.  
+
+Fixed a few typos, perhaps added more, renamed the default wwise project it creates for conversion.
+
+### - Version 2 (Release)
+
+ffmpeg and wwise conversion features, automatic installation and updates, 
+
+### - Version 1 (Pre-release)
+
+Development proof of concept.
+
+## Special thanks
+
+veksha

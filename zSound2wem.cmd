@@ -1,6 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 title Soundsfiles to Wwise .wem
+chcp 65001>nul
 color f
 :: Setting current directory to the folder the script is in (just in case).
 set "cd=%~dp0"
@@ -8,8 +9,8 @@ if "!cd:~-1,1!"=="\" set "cd=!cd:~0,-1!"
 cd !cd!
 
 :: [Script Author:   "Leo Pasanen"]
-:: [Script Version:  "2"]
-:: [Date of version: "28.4.2023"]
+:: [Script Version:  "3"]
+:: [Date of version: "27.1.2025"]
 :: [Code License:    "Mozilla Public License 2.0"]
 
 ::----------------------------------------::
@@ -66,7 +67,7 @@ set extra=
 set "conversion=Vorbis Quality High
 
 :: Wwise Conversion Project Path (See [?])
-set "project=wemtowavscript
+set "project=wavtowemscript
 
 :: Output directy, blank = current
 set "out=
@@ -75,10 +76,10 @@ set "out=
 set CloseOnExit=true
 
 :: Automatically check for script updates from github [true/false/forced] (forced doesn't ask whether to install, it just does)
-set updates=forced
+set updates=true
 
 :: Script version
-set version=2
+set version=3
 ::----------------------------------------::
 
 :: [Some examples of what some conversion options might look like]
@@ -98,10 +99,16 @@ set version=2
 :: Update just installed if this flag is passed
 if "%~1"=="installtmp" (
 cd..
-copy /Y "installtmp\zSound2wem.cmd" "zSound2wem.cmd" > nul
-set "args="<"argstmp.txt"
-del /q /f "argstmp.txt"
-start zSound2wem.cmd !args!
+ren zSound2wem.cmd zSound2wem.cmd.old
+echo If you are asked to replace a file, it is recommended to not do so, as it will likely delete your previous script configuration.
+copy "installtmp\zSound2wem.cmd" "zSound2wem.cmd" > nul
+:: Legacy argument passing file, we're not using it anymore.
+if exist "argstmp.txt" del /q /f "argstmp.txt"
+echo(
+echo Successfully updated^^!
+echo You need to manually migrate your script configs from zSound2wem.cmd.old to zSound2wem.cmd.
+echo Quiting in 10 seconds or upon keypress...
+timeout /t 10 > nul
 exit
 )
 :: Delete update dregs if they exist.
@@ -109,18 +116,20 @@ if exist "installtmp\*" rmdir /s /q "installtmp"
 :: Check for updates if enabled.
 if /i not "!updates!"=="true" if /i not "!updates!"=="forced" goto noupdates
 for /f "tokens=1" %%a in ('curl -s "https://raw.githubusercontent.com/EternalLeo/sound2wem/main/version.txt"')do set "cloudver=%%a"
-if "!cloudver!"=="400:" echo [91mWarning:[39m could not fetch online version.&goto noupdates
+if not "!cloudver::=!"=="!cloudver!" echo [91mWarning:[39m could not fetch online version.&goto noupdates
 if !version! GEQ !cloudver! goto noupdates
 if /i "!updates!"=="true" (
-echo A script update is available. Do you want to install it right now? [[38;5;35mY[39m/[91mN[39m]
+echo A script update is available. Do you want to install it right now? This will cancel your conversion. [[38;5;35mY[39m/[91mN[39m]
 for /f "tokens=*" %%a in ('choice /c YN /n')do if "%%a"=="N" goto noupdates
 )
 md installtmp
 curl -O --output-dir "installtmp" -# "https://raw.githubusercontent.com/EternalLeo/sound2wem/main/zSound2wem.cmd"
 if not exist "installtmp\zSound2wem.cmd" echo [91mWarning:[39m Update unsuccessful.&goto noupdates
 :: Check filesize of download so that it doesn't just contain a network error or something.
-for %%a in ("installtmp\zSound2wem.cmd")do if %%~za LSS 5000 echo [91mWarning:[39m Update unsuccessful.&goto noupdates
-echo %*>argstmp.txt
+for %%a in ("installtmp\zSound2wem.cmd")do (
+	if %%~za LSS 5000 echo [91mWarning:[39m Update unsuccessful.&goto noupdates
+	if %%~za GTR 50000 echo [91mWarning:[39m Update likely unsuccessful.&goto noupdates
+)
 start installtmp\zSound2wem.cmd installtmp
 exit
 :noupdates
@@ -155,7 +164,7 @@ exit
 :: Check for FFmpeg.
 
 if exist "!ffmpeg!" goto conversion
-for /f %%a in ('dir /b /a:d /o:d /t:c ^| findstr "ffmpeg"')do if exist "%%a\bin\ffmpeg.exe" set ffmpeg="%%a\bin\ffmpeg.exe"&goto conversion
+for /f "tokens=*" %%a in ('dir /b /a:d /o:d /t:c ^| findstr "ffmpeg"')do if exist "%%a\bin\ffmpeg.exe" set "ffmpeg=%%a\bin\ffmpeg.exe"&goto conversion
 where /q ffmpeg && (set ffmpeg=ffmpeg&goto conversion)
 :: See [?3] for brief explanation on finding process.
 
@@ -179,8 +188,8 @@ if not exist "7z2201-extra.7z" curl -O -# "https://www.7-zip.org/a/7z2201-extra.
 del /q /f 7z2201-extra.7z
 
 :: Check OS architecture on whether to use the 32-bit or 64-bit version. (Two for loops to get rid of empty newline.)
-for /f %%a in ('wmic os get osarchitecture')do for /f "delims=-" %%b in ("%%a")do set "OSarchitecture=%%b"
-if "!OSarchitecture!"=="64" (set "7zPATH=7ztemp\x64\7za.exe")else set "7zPATH=7ztemp\7za.exe"
+:: It will always be AMD64 on 64-bit x86, even if it's an intel processor.
+if "%PROCESSOR_ARCHITECTURE%"=="AMD64" (set "7zPATH=7ztemp\x64\7za.exe")else set "7zPATH=7ztemp\7za.exe"
 
 if not exist "!7zPATH!" echo [91mError: [93m7zip[91m not found by unknown error.[39m&echo If 7zip was successfully installed regardless, try specifying it in the script configs ^(right-click + edit^), or try rerunning the script.&echo Aborting... &<nul set/p=Press any key to exit... & pause>nul & exit
 
@@ -189,7 +198,7 @@ if not exist "!7zPATH!" echo [91mError: [93m7zip[91m not found by unknown err
 
 :: I'm too lazy to care about automatically downloading for 32-bit PCs right now, maybe I'll update the script for that one day.
 if not exist "ffmpeg-master-latest-win64-gpl-shared.zip" curl -L -O -# "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip"
-!7zPATH! x "ffmpeg-master-latest-win64-gpl-shared.zip" > nul
+"!7zPATH!" x "ffmpeg-master-latest-win64-gpl-shared.zip" > nul
 :: Remove temporary dregs
 if exist "ffmpeg-master-latest-win64-gpl-shared\bin\ffmpeg.exe" (set "ffmpeg=ffmpeg-master-latest-win64-gpl-shared\bin\ffmpeg.exe")else echo [91mError: [93mFFmpeg[91m not found by unknown error.[39m&echo If FFmpeg was successfully installed regardless, try specifying it in the script configs ^(right-click + edit^).&echo Aborting... &<nul set/p=Press any key to exit... & pause>nul & exit
 if exist "ffmpeg-master-latest-win64-gpl-shared.zip" del /q /f ffmpeg-master-latest-win64-gpl-shared.zip
@@ -199,8 +208,8 @@ if exist "7ztemp\*" rmdir /s /q 7ztemp
 echo [38;5;35mInstallation Success^^![39m
 :: [Installation section end]
 :conversion
-if "%*"=="" echo [91mError: [95mNo arguments[39m were provided, unable to convert [36mnull[39m. ^(No sound files given^) &<nul set/p=Press any key to exit... & pause>nul & exit
-:: %* Contains all arguements, from this point on, the script needs audio files to convert.
+if "%~1"=="" echo [91mError: [95mNo arguments[39m were provided, unable to convert [36mnull[39m. ^(No sound files given^) &<nul set/p=Press any key to exit... & pause>nul & exit
+:: %* Contains all arguments, from this point on, the script needs audio files to convert.
 
 :: Create Project for conversion
 if not exist "!project!\*" "!wwisePATH!" create-new-project "!project!\!project!.wproj" --quiet
@@ -213,7 +222,7 @@ if not "!channels!"=="" set "channels=-ac !channels! "
 if not "!volume!"=="" set volume=-filter:a "volume=!volume!" 
 if not "!extra!"=="" set "extra=!extra! " 
 :: Convert audio files to (.wav) using preferred user settings, to then convert with Wwise.
-for %%a in (%*)do !ffmpeg! -hide_banner -loglevel warning -i %%a !bitrate!!channels!!volume!!extra!"audiotemp\%%~na.wav"
+for %%a in (%*)do "!ffmpeg!" -hide_banner -loglevel warning -i %%a !bitrate!!channels!!volume!!extra!"audiotemp\%%~na.wav"
 
 :: Create wsources file for Wwise conversion. See [?5] to view the format more clearly.
 if exist "list.wsources" del /q /f "list.wsources"
@@ -256,7 +265,7 @@ exit
 :: If this is a problem, use the second method, adding quotes, and even escaping characters if necessary.
 
 :: [?5] - .wsources format
-:: <?xml version="1.0" encoding="UTF-8"?^>
+:: <?xml version="1.0" encoding="UTF-8"?>
 :: <ExternalSourcesList SchemaVersion="1" Root="[Directory for audio files]">
 :: [Repeat the following source line for all audio files]
 :: 	<Source Path="[filename]" Conversion="[Case Sensitive Name for conversion target]"/>
