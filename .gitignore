@@ -1,0 +1,7 @@
+# Sound files
+*.mp3
+*.wav
+*.wem
+
+# All folders
+*/

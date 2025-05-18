@@ -51,8 +51,8 @@ set "ffmpeg=
 :: Path to 7zip, (blank = current directory / in path) (7zip is only required for automated installation)
 set "7zPATH=
 
-:: Audio frequency in Hz. (Do not include the unit, see examples below) (blank means same as source)
-set bitrate=
+:: Audio frequency in Hz. (Do not include the unit, e.g. 8000, 24000, 48000) (blank means same as source)
+set samplerate=
 
 :: Audio channels, 1 is mono, 2 is stereo... (blank means same as source)
 set channels=
@@ -63,7 +63,7 @@ set volume=
 :: ffmpeg extra - extra parameters to include for ffmpeg to change your audio, example (loudnorm) to normalize volume. (blank = nothing)
 set extra=
 
-:: Conversion (case-sensitive name)
+:: Conversion (case-sensitive name), specifies the conversion type and the quality affects the size and bitrate of the result. (High, Medium, Low)
 set "conversion=Vorbis Quality High
 
 :: Wwise Conversion Project Path (See [?])
@@ -79,12 +79,12 @@ set CloseOnExit=true
 set updates=true
 
 :: Script version
-set version=3
+set version=4
 ::----------------------------------------::
 
 :: [Some examples of what some conversion options might look like]
 :: set "ffmpeg=C:\Users\myuser\ffmpeg\bin\ffmpeg.exe
-:: set bitrate=48000
+:: set samplerate=48000
 :: set volume=2.5
 :: set channels=1
 :: [End examples]
@@ -133,6 +133,26 @@ for %%a in ("installtmp\zSound2wem.cmd")do (
 start installtmp\zSound2wem.cmd installtmp
 exit
 :noupdates
+
+:: Command line lazy argument parsing
+for %%a in (%*) do (
+	set "validarg=%%~a"
+	if "!validarg:~0,2!"=="--" (
+		for /f "tokens=1,2 delims=:" %%b in ("!validarg:~2!") do (
+			set "argument=%%b"
+			set "value=%%c"
+		)
+		if "!argument!"=="ffmpeg" set "ffmpeg=!value!"
+		if "!argument!"=="wwise" set "wwisePATH=!value!"
+		if "!argument!"=="samplerate" set "samplerate=!value!"
+		if "!argument!"=="channels" set "channels=!value!"
+		if "!argument!"=="volume" set "volume=!value!"
+		if "!argument!"=="extra" set "extra=!value!"
+		if "!argument!"=="conversion" set "conversion=!value!"
+		if "!argument!"=="out" set "out=!value!"
+		set CloseOnExit=true
+	)
+) 
 
 :: Save all drive letters (useful if a requirement is not found, to crawl for it in all drives)
 for /f "tokens=1*" %%a in ('fsutil fsinfo drives')do set "Drives=%%b"
@@ -217,12 +237,12 @@ if not exist "!project!\*" "!wwisePATH!" create-new-project "!project!\!project!
 :: ffmpeg conversion
 md audiotemp
 :: Setting flags
-if not "!bitrate!"=="" set "bitrate=-ar !bitrate! "
+if not "!samplerate!"=="" set "samplerate=-ar !samplerate! "
 if not "!channels!"=="" set "channels=-ac !channels! "
-if not "!volume!"=="" set volume=-filter:a "volume=!volume!" 
+if not "!volume!"=="" set "volume=!volume:db=dB!" & set volume=-filter:a "volume=!volume!" 
 if not "!extra!"=="" set "extra=!extra! " 
 :: Convert audio files to (.wav) using preferred user settings, to then convert with Wwise.
-for %%a in (%*)do "!ffmpeg!" -hide_banner -loglevel warning -i %%a !bitrate!!channels!!volume!!extra!"audiotemp\%%~na.wav"
+for %%a in (%*)do set "validarg=%%~a" & if not "!validarg:~0,2!"=="--" "!ffmpeg!" -hide_banner -loglevel warning -i %%a !samplerate!!channels!!volume!!extra!"audiotemp\%%~na.wav"
 
 :: Create wsources file for Wwise conversion. See [?5] to view the format more clearly.
 if exist "list.wsources" del /q /f "list.wsources"
@@ -234,8 +254,8 @@ for /f "tokens=* delims=" %%a in ('dir audiotemp /b ')do echo 	^<Source Path="%%
 echo ^</ExternalSourcesList^>>> "list.wsources"
 if "!out!"=="" set "out=!cd!"
 "!wwisePATH!" convert-external-source "!project!\!project!.wproj" --source-file "!cd!\list.wsources" --output "!out!" --quiet
-for %%a in (%*)do del /f /q "audiotemp\%%~na.akd"
-for %%a in (%*)do del /f /q "audiotemp\%%~na.wav"
+for %%a in (%*)do if exist "audiotemp\%%~na.akd" del /f /q "audiotemp\%%~na.akd"
+for %%a in (%*)do if exist "audiotemp\%%~na.wav" del /f /q "audiotemp\%%~na.wav"
 move "!cd!\Windows\*" "!cd!" >nul
 rmdir /s /q "!out!\Windows"
 rmdir /q "audiotemp"
