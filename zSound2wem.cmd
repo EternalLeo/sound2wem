@@ -9,8 +9,8 @@ if "!cd:~-1,1!"=="\" set "cd=!cd:~0,-1!"
 cd !cd!
 
 :: [Script Author:   "Leo Pasanen"]
-:: [Script Version:  "3"]
-:: [Date of version: "27.1.2025"]
+:: [Script Version:  "5"]
+:: [Date of version: "3.6.2025"]
 :: [Code License:    "Mozilla Public License 2.0"]
 
 ::----------------------------------------::
@@ -79,7 +79,7 @@ set CloseOnExit=true
 set updates=true
 
 :: Script version
-set version=4
+set version=5
 ::----------------------------------------::
 
 :: [Some examples of what some conversion options might look like]
@@ -97,18 +97,23 @@ set version=4
 :: [Installation section]
 
 :: Update just installed if this flag is passed
-if "%~1"=="installtmp" (
+:: Migrating away from old flag without --, backwards compatability
+if "%~1"=="installtmp" set yesinstall=True
+if "%~1"=="--installtmp" set yesinstall=True
+if "!yesinstall!"=="True" (
 cd..
+set yesinstall=False
 ren zSound2wem.cmd zSound2wem.cmd.old
 echo If you are asked to replace a file, it is recommended to not do so, as it will likely delete your previous script configuration.
 copy "installtmp\zSound2wem.cmd" "zSound2wem.cmd" > nul
-:: Legacy argument passing file, we're not using it anymore.
-if exist "argstmp.txt" del /q /f "argstmp.txt"
+timeout /t 1 > nul
+:: Dash neutralizes installtmp flag
+start zSound2wem.cmd -%*
 echo(
 echo Successfully updated^^!
 echo You need to manually migrate your script configs from zSound2wem.cmd.old to zSound2wem.cmd.
-echo Quiting in 10 seconds or upon keypress...
-timeout /t 10 > nul
+echo Quiting in 15 seconds or upon keypress...
+timeout /t 15 > nul
 exit
 )
 :: Delete update dregs if they exist.
@@ -119,7 +124,7 @@ for /f "tokens=1" %%a in ('curl -s "https://raw.githubusercontent.com/EternalLeo
 if not "!cloudver::=!"=="!cloudver!" echo [91mWarning:[39m could not fetch online version.&goto noupdates
 if !version! GEQ !cloudver! goto noupdates
 if /i "!updates!"=="true" (
-echo A script update is available. Do you want to install it right now? This will cancel your conversion. [[38;5;35mY[39m/[91mN[39m]
+echo A script update is available. Do you want to install it right now? Your files will still convert. [[38;5;35mY[39m/[91mN[39m]
 for /f "tokens=*" %%a in ('choice /c YN /n')do if "%%a"=="N" goto noupdates
 )
 md installtmp
@@ -130,15 +135,14 @@ for %%a in ("installtmp\zSound2wem.cmd")do (
 	if %%~za LSS 5000 echo [91mWarning:[39m Update unsuccessful.&goto noupdates
 	if %%~za GTR 50000 echo [91mWarning:[39m Update likely unsuccessful.&goto noupdates
 )
-start installtmp\zSound2wem.cmd installtmp
-exit
+set installquit=True
 :noupdates
 
 :: Command line lazy argument parsing
 for %%a in (%*) do (
 	set "validarg=%%~a"
 	if "!validarg:~0,2!"=="--" (
-		for /f "tokens=1,2 delims=:" %%b in ("!validarg:~2!") do (
+		for /f "tokens=1* delims=:" %%b in ("!validarg:~2!") do (
 			set "argument=%%b"
 			set "value=%%c"
 		)
@@ -153,6 +157,12 @@ for %%a in (%*) do (
 		set CloseOnExit=true
 	)
 ) 
+
+if "!installquit!"=="True" (
+	set installquit=False
+	start installtmp\zSound2wem.cmd --installtmp "--ffmpeg:!ffmpeg!" "--wwise:!wwisePATH!" "--samplerate:!samplerate!" "--channels:!channels!" "--volume:!volume!" "--extra:!extra!" "--conversion:!conversion!" "--out:!out!" %*
+	exit
+)
 
 :: Save all drive letters (useful if a requirement is not found, to crawl for it in all drives)
 for /f "tokens=1*" %%a in ('fsutil fsinfo drives')do set "Drives=%%b"
@@ -256,7 +266,7 @@ if "!out!"=="" set "out=!cd!"
 "!wwisePATH!" convert-external-source "!project!\!project!.wproj" --source-file "!cd!\list.wsources" --output "!out!" --quiet
 for %%a in (%*)do if exist "audiotemp\%%~na.akd" del /f /q "audiotemp\%%~na.akd"
 for %%a in (%*)do if exist "audiotemp\%%~na.wav" del /f /q "audiotemp\%%~na.wav"
-move "!cd!\Windows\*" "!cd!" >nul
+move "!out!\Windows\*" "!out!" >nul
 rmdir /s /q "!out!\Windows"
 rmdir /q "audiotemp"
 del /f /q list.wsources
