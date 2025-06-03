@@ -76,9 +76,17 @@ I use `Wwiseutil-gui` or `BNKReplacer` to replace the desired audio files in Wwi
 ## Future Development
 
 - Increasing support for customizable automated workflows, or even external config files.
-- Potentially re-include temporarily storing arguments in case of script update.
+- There are multiple possible methods to implement conversion despite a script update, and albeit it works at the moment, it is possible one of these will be considered:
+  1. Complete the conversion first, then update (most safe, conversion will not be most up-to-date — albeit typically updates are only bugfixes anyway)
+  2. Pass the conversion arguments through the environment with the `start` command (may help with tricky characters and related errors)
 
 ## Changelog
+
+### - Version 5
+
+Fixed the `out` configuration option.
+Fixed argument parsing where it would incorrectly set the value in `key:value` if value contained a column. Multiple columns in-between will still get ignored.
+Added passing of temporary arguments after script updates to complete conversion.
 
 ### - Version 4
 
