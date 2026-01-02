@@ -9,8 +9,8 @@ if "!cd:~-1,1!"=="\" set "cd=!cd:~0,-1!"
 cd !cd!
 
 :: [Script Author:   "Leo Pasanen"]
-:: [Script Version:  "5"]
-:: [Date of version: "3.6.2025"]
+:: [Script Version:  "6"]
+:: [Date of version: "2.1.2026"]
 :: [Code License:    "Mozilla Public License 2.0"]
 
 ::----------------------------------------::
@@ -72,6 +72,9 @@ set "project=wavtowemscript
 :: Output directy, blank = current
 set "out=
 
+:: Audio formats to convert in specified directories [space or comma separated audioformats ".mp3 .ogg"]
+set "audioformats=.wav .mp3 .ogg .flac
+
 :: Whether to close the window when the conversion is done [true/false]
 set CloseOnExit=true
 
@@ -79,7 +82,7 @@ set CloseOnExit=true
 set updates=true
 
 :: Script version
-set version=5
+set version=6
 ::----------------------------------------::
 
 :: [Some examples of what some conversion options might look like]
@@ -94,7 +97,7 @@ set version=5
 :: Effectively, one quotation mark removes the need for the user to add quotation marks of their own, while also preserving special characters.
 :: Also, it is standard to put the quotation mark before the variable name, so that it isn't actually included in the contents.
 
-:: [Installation section]
+:: [Update section]
 
 :: Update just installed if this flag is passed
 :: Migrating away from old flag without --, backwards compatability
@@ -136,6 +139,7 @@ for %%a in ("installtmp\zSound2wem.cmd")do (
 	if %%~za GTR 50000 echo [91mWarning:[39m Update likely unsuccessful.&goto noupdates
 )
 set installquit=True
+:: [Update section END]
 :noupdates
 
 :: Command line lazy argument parsing
@@ -154,16 +158,18 @@ for %%a in (%*) do (
 		if "!argument!"=="extra" set "extra=!value!"
 		if "!argument!"=="conversion" set "conversion=!value!"
 		if "!argument!"=="out" set "out=!value!"
+                if "!argument!"=="audioformats" set "audioformats=!value!"
 		set CloseOnExit=true
 	)
 ) 
 
 if "!installquit!"=="True" (
 	set installquit=False
-	start installtmp\zSound2wem.cmd --installtmp "--ffmpeg:!ffmpeg!" "--wwise:!wwisePATH!" "--samplerate:!samplerate!" "--channels:!channels!" "--volume:!volume!" "--extra:!extra!" "--conversion:!conversion!" "--out:!out!" %*
+	start installtmp\zSound2wem.cmd --installtmp "--ffmpeg:!ffmpeg!" "--wwise:!wwisePATH!" "--samplerate:!samplerate!" "--channels:!channels!" "--volume:!volume!" "--extra:!extra!" "--conversion:!conversion!" "--out:!out!" "--audioformats:!audioformats!" %*
 	exit
 )
 
+:: [Installation Section]
 :: Save all drive letters (useful if a requirement is not found, to crawl for it in all drives)
 for /f "tokens=1*" %%a in ('fsutil fsinfo drives')do set "Drives=%%b"
 if "!Drives!"=="" set "Drives=A B C D E F G H I J K L M N O P Q R S T U V W X Y Z"%= No drive letters found, so add them all manually to check. (a just in case feature) What is this? See [?2] =%
@@ -238,7 +244,7 @@ if exist "7ztemp\*" rmdir /s /q 7ztemp
 echo [38;5;35mInstallation Success^^![39m
 :: [Installation section end]
 :conversion
-if "%~1"=="" echo [91mError: [95mNo arguments[39m were provided, unable to convert [36mnull[39m. ^(No sound files given^) &<nul set/p=Press any key to exit... & pause>nul & exit
+if "%~1"=="" echo [91mError: [95mNo arguments[39m were provided, unable to convert [36mnull[39m. ^(No sound files or folders given^) &<nul set/p=Press any key to exit... & pause>nul & exit
 :: %* Contains all arguments, from this point on, the script needs audio files to convert.
 
 :: Create Project for conversion
@@ -248,11 +254,26 @@ if not exist "!project!\*" "!wwisePATH!" create-new-project "!project!\!project!
 md audiotemp
 :: Setting flags
 if not "!samplerate!"=="" set "samplerate=-ar !samplerate! "
-if not "!channels!"=="" set "channels=-ac !channels! "
+if not "!channels!"=="" set "channels=-ac !channels! "  
 if not "!volume!"=="" set "volume=!volume:db=dB!" & set volume=-filter:a "volume=!volume!" 
 if not "!extra!"=="" set "extra=!extra! " 
+set "audioext="
+for %%b in (!audioformats!) do set audioext=!audioext! "%%~a\*%%b"
+set /a uid=0
 :: Convert audio files to (.wav) using preferred user settings, to then convert with Wwise.
-for %%a in (%*)do set "validarg=%%~a" & if not "!validarg:~0,2!"=="--" "!ffmpeg!" -hide_banner -loglevel warning -i %%a !samplerate!!channels!!volume!!extra!"audiotemp\%%~na.wav"
+for %%a in (%*)do set "validarg=%%~a" & if not "!validarg:~0,2!"=="--" (
+  if exist "%%~a\" ( %= item is folder =%
+    for /f "tokens=* delims=" %%b in ('dir /b %audioext% 2^>nul') do (
+      set "name_modifier="
+      if exist "audiotemp\%%~nb.wav" set "name_modifier=!uid!" & set /a uid+=1
+      "!ffmpeg!" -hide_banner -loglevel warning -i "%%~fa\%%b" !samplerate!!channels!!volume!!extra!"audiotemp\%%~nb!name_modifier!.wav"
+    )
+  ) else (
+    set "name_modifier="
+    if exist "audiotemp\%%~na.wav" set "name_modifier=!uid!" & set /a uid+=1
+    "!ffmpeg!" -hide_banner -loglevel warning -i %%a !samplerate!!channels!!volume!!extra!"audiotemp\%%~na!name_modifier!.wav"
+  )
+)
 
 :: Create wsources file for Wwise conversion. See [?5] to view the format more clearly.
 if exist "list.wsources" del /q /f "list.wsources"
@@ -264,11 +285,9 @@ for /f "tokens=* delims=" %%a in ('dir audiotemp /b ')do echo 	^<Source Path="%%
 echo ^</ExternalSourcesList^>>> "list.wsources"
 if "!out!"=="" set "out=!cd!"
 "!wwisePATH!" convert-external-source "!project!\!project!.wproj" --source-file "!cd!\list.wsources" --output "!out!" --quiet
-for %%a in (%*)do if exist "audiotemp\%%~na.akd" del /f /q "audiotemp\%%~na.akd"
-for %%a in (%*)do if exist "audiotemp\%%~na.wav" del /f /q "audiotemp\%%~na.wav"
 move "!out!\Windows\*" "!out!" >nul
 rmdir /s /q "!out!\Windows"
-rmdir /q "audiotemp"
+rmdir /s /q "audiotemp"
 del /f /q list.wsources
 :: No we did not just delete Windows, do not worry. Funny naming sense, Audiokinetic.
 echo [38;5;35mDone.[39m

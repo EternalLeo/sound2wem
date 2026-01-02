@@ -59,6 +59,7 @@ The following command line arguments are available for running the script. Scrip
   --extra       | Extra flags for ffmpeg
   --conversion  | WWise conversion output e.g. "Vorbis Quality Medium"
   --out         | Output directory
+  --audioformats| List of audio file extensions to convert when specifying directory
 ```
 Instead of the typical `--flag value` convention, the script requires `--flag:value`.
 If the flag contains spaces, enclose it in quotes, like so `"--flag:long value"`. This means no files starting with "--", but if you need this to work you can specify the full path (not an issue with drag 'n drop, which does so by default).
@@ -81,6 +82,12 @@ I use `Wwiseutil-gui` or `BNKReplacer` to replace the desired audio files in Wwi
   2. Pass the conversion arguments through the environment with the `start` command (may help with tricky characters and related errors)
 
 ## Changelog
+
+### - Version 6
+
+Added possibility of providing directories as arguments, including the relevant `audioformats` parameter.
+Rudimentary conversion naming conflict solving with incrementing integer.
+Failcase if an audiofile has the same name as a increment for the name conflict. Good enough for now?
 
 ### - Version 5
 
@@ -117,4 +124,4 @@ Development proof of concept.
 
 ## Special thanks
 
-veksha, MST246
+veksha, MST246, mousavizare
